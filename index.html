@@ -118,7 +118,7 @@
   <button id="menuBtn" title="菜单" aria-label="菜单">☰</button>
 </div>
 <div id="menu" class="panel">
-  <h1>修仙五子棋 <span style="font-size:11px;letter-spacing:0;opacity:.6;-webkit-text-fill-color:#cfc6b0">版本 11-18 21:50</span></h1>
+  <h1>修仙五子棋 <span style="font-size:11px;letter-spacing:0;opacity:.6;-webkit-text-fill-color:#cfc6b0">版本 11-21 07:45</span></h1>
   <div id="realmName"></div>
   <div id="pips"></div>
   <div id="score"></div>
@@ -154,7 +154,7 @@
       <button id="joinRoom">进入房间</button></div>
     <div id="roomInfo" style="margin-top:6px;line-height:1.6"></div>
     <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-      <button id="newGame">新开一局</button><button id="takeSeat">入座下棋</button><button id="watchBtn">我去观战</button>
+      <button id="newGame">新开一局</button><button id="takeSeat">入座执黑</button><button id="takeSeatW">入座执白</button><button id="watchBtn">我去观战</button>
     </div>
   </div>
   <div style="font-size:11px;opacity:.6;margin-top:8px">拖动可任意旋转棋盘 · 滚轮/双指缩放 · 点击棋盘落子</div>
@@ -2063,6 +2063,7 @@ async function netJoin(code) {
 const onl = { room: null, user: null, nr: null, uid: null, code: '', rec: { g: 0, v: 0, b: null, w: null, m: [] },
   appliedG: -1, applied: 0, doneG: -1, watch: false, ready: false, names: {}, unsub: null };
 const emptyRec = () => ({ g: 0, v: 0, b: null, w: null, m: [] });
+const ROOM_MAX = 12;   // 2 位对弈 + 10 位观棋
 function cleanRec(r) {
   if (!r || typeof r !== 'object') return null;
   const g = +r.g | 0, v = +r.v | 0;
@@ -2130,7 +2131,7 @@ async function joinRoom(code) {
     catch (e2) { renderOnline('进入房间失败（' + (e2 && e2.code || e2) + '），请稍后再试'); return; }
   }
   if (!onl.uid) onl.uid = 'peer-' + Math.random().toString(36).slice(2, 10);
-  onl.rec = emptyRec(); onl.appliedG = -1; onl.applied = 0; onl.doneG = -1; onl.ready = false;
+  onl.rec = emptyRec(); onl.appliedG = -1; onl.applied = 0; onl.doneG = -1; onl.ready = false; onl.checkedFull = false;
   clearBoardVisual(); onl.appliedG = 0;
   onl.unsub = onl.nr.onPeers(() => reconcile(), e => renderOnline('联机已断开（' + e.code + '）'));
   publish();
@@ -2150,16 +2151,15 @@ function reconcile() {
     if (r && better(r, best)) best = r;
   }
   if (best !== onl.rec) { onl.rec = best; publish(); }
-  // 自动入座：有空位、我没坐下、没选观战
-  if (onl.ready && !mySeat() && !onl.watch) {
-    const here = presentIds(), r = onl.rec;
-    const free = s => !r[s] || !here.has(r[s]);
-    if (r.m.length === 0 && (free('b') || free('w'))) {
-      const nr = { ...r, v: r.v + 1, m: [] };
-      if (free('b')) nr.b = onl.uid; else nr.w = onl.uid;
-      if (nr.g === 0) nr.g = 1;
-      setRec(nr); return;
+  // 不自动入座：进来的人默认观棋，自己点「入座执黑 / 入座执白」
+  if (onl.ready && !onl.checkedFull) {
+    onl.checkedFull = true;
+    if (!mySeat() && presentIds().size > ROOM_MAX) {   // 2 位对弈 + 10 位观棋
+      onlineLeave().then(() => renderOnline('房间已满（2 人对弈 + 10 人观棋），请稍后再进'));
+      return;
     }
+    const r = onl.rec, here = presentIds();
+    if (!mySeat() && ((!r.b || !here.has(r.b)) || (!r.w || !here.has(r.w)))) { try { $('menu').classList.add('open'); } catch (e) {} }
   }
   applyRec(); renderOnline(); loadNames();
 }
@@ -2216,7 +2216,7 @@ function onlineMove(x, y) {
 function onlineStatusText() {
   if (!onl.nr) return '联机对战：进入房间后开始';
   const r = onl.rec, me = mySeat();
-  if (!r.b || !r.w) return '等待两位道友入座……';
+  if (!r.b || !r.w || !presentIds().has(r.b) || !presentIds().has(r.w)) return me ? '等待另一位道友入座……' : '有空座：点右下角 ☰ 选「入座执黑 / 入座执白」';
   if (gameOver) {
     const wc = history.length ? history[history.length - 1].c : 0;
     if (!wc) return '对局结束';
@@ -2237,11 +2237,13 @@ function renderOnline(msg) {
   line(`🏠 房间 ${onl.code}　把房间号告诉朋友即可同桌`);
   line(`⚫ 黑方：${nameOf(r.b)}${tag(r.b)}${r.b ? ' · ' + REALMS[lvOf(r.b) - 1].name : ''}`);
   line(`⚪ 白方：${nameOf(r.w)}${tag(r.w)}${r.w ? ' · ' + REALMS[lvOf(r.w) - 1].name : ''}`);
-  line(`👀 观战：${watchers.length ? watchers.map(nameOf).join('、') : '暂无'}`);
+  line(`👀 观棋（${watchers.length}/10）：${watchers.length ? watchers.map(nameOf).join('、') : '暂无'}`);
   const me = mySeat();
   $('newGame').style.display = me ? '' : 'none';
-  $('takeSeat').style.display = !me && (!r.b || !r.w || !here.has(r.b) || !here.has(r.w)) ? '' : 'none';
-  $('watchBtn').textContent = me ? '让座去观战' : (onl.watch ? '取消观战' : '我只观战');
+  $('takeSeat').style.display = !me && (!r.b || !here.has(r.b)) ? '' : 'none';
+  $('takeSeatW').style.display = !me && (!r.w || !here.has(r.w)) ? '' : 'none';
+  $('watchBtn').style.display = me ? '' : 'none';
+  $('watchBtn').textContent = '让座去观棋';
   updateStatus();
 }
 function onlineLabels() {
@@ -2260,15 +2262,18 @@ $('newGame').onclick = () => {
   const b = r.w && here.has(r.w) ? r.w : null, w = r.b && here.has(r.b) ? r.b : null;
   setRec({ g: r.g + 1, v: r.v + 1, b, w, m: [] });
 };
-$('takeSeat').onclick = () => {
+function sitAt(seat) {
   const r = onl.rec, here = presentIds();
+  if (!onl.nr || mySeat()) return;
+  if (r[seat] && here.has(r[seat])) { renderOnline(); return; }   // 已经有人坐了
   onl.watch = false;
-  const nr = { ...r, v: r.v + 1 };
-  if (!r.b || !here.has(r.b)) nr.b = onl.uid; else if (!r.w || !here.has(r.w)) nr.w = onl.uid; else return;
+  const nr = { ...r, v: r.v + 1 }; nr[seat] = onl.uid;
   if (r.m.length) { nr.g = r.g + 1; nr.m = []; }   // 换人就开新局
   if (!nr.g) nr.g = 1;
-  setRec(nr);
-};
+  setRec(nr); $('menu').classList.remove('open');
+}
+$('takeSeat').onclick = () => sitAt('b');
+$('takeSeatW').onclick = () => sitAt('w');
 $('watchBtn').onclick = () => {
   const me = mySeat(), r = onl.rec;
   if (me) {
