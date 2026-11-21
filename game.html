@@ -2318,7 +2318,7 @@ modeEl.onchange = () => {
   if (isOnline()) onlineEnter();
 };
 levelEl.onchange = () => { if (!started) return; buildOpponent(); reset(); };
-$('view').onclick = () => { cam.userZoomed = false; cam.zoomRel = 1; try { localStorage.removeItem('gomoku3d_view'); } catch (e) {} const h = homeView(); camTo({ theta: Math.round(cam.theta / (Math.PI * 2)) * Math.PI * 2 + h.theta, phi: h.phi, zoom: h.zoom }); };
+$('view').onclick = () => { cam.userZoomed = false; cam.zoomRel = 1; try { localStorage.removeItem('gomoku3d_view_v2'); } catch (e) {} const h = homeView(); camTo({ theta: Math.round(cam.theta / (Math.PI * 2)) * Math.PI * 2 + h.theta, phi: h.phi, zoom: h.zoom }); };
 $('zoomIn').onclick = () => (cam.userZoomed = true) && camTo({ zoom: Math.max(cam.homeZoom * 0.2, cam.zoom / 1.25) });   // zoom 越小，镜头越近、棋盘越大
 $('zoomOut').onclick = () => (cam.userZoomed = true) && camTo({ zoom: Math.min(cam.homeZoom * 4, cam.zoom * 1.25) });
 $('flip').onclick = () => camTo({ theta: cam.theta + Math.PI });
@@ -2352,9 +2352,9 @@ $('setDefault').onclick = async () => {
   catch (e) { updateStatus('⚠️ 设为默认没有成功，请稍后再试'); }
   setTimeout(() => updateStatus(), 3500);
 };
-function saveView() { try { localStorage.setItem('gomoku3d_view', JSON.stringify({ theta: cam.theta, phi: cam.phi, zoomRel: cam.zoom / (cam.homeZoom || 1) })); } catch (e) {} }
+function saveView() { try { localStorage.setItem('gomoku3d_view_v2', JSON.stringify({ theta: cam.theta, phi: cam.phi, zoomRel: cam.zoom / (cam.homeZoom || 1) })); } catch (e) {} }
 function loadView() {
-  try { const v = JSON.parse(localStorage.getItem('gomoku3d_view')); if (!v) return;
+  try { const v = JSON.parse(localStorage.getItem('gomoku3d_view_v2')); if (!v) return;
     cam.theta = +v.theta || 0; cam.phi = Math.min(PHI_MAX, Math.max(0.15, +v.phi || HOME_PHI)); cam.zoomRel = Math.min(2.5, Math.max(0.2, +v.zoomRel || 1)); cam.userZoomed = true;
   } catch (e) {}
 }
