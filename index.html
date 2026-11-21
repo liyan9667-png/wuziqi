@@ -53,6 +53,7 @@
     white-space: nowrap; text-shadow: 0 0 8px currentColor; font-family: "KaiTi","STKaiti","Microsoft YaHei",serif; }
   .panel { position: fixed; z-index: 5; background: rgba(12, 16, 32, .55); backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255, 215, 120, .25); border-radius: 10px; }
+  .seatBtn { font-size: 15px !important; padding: 7px 14px !important; border-radius: 18px !important; background: linear-gradient(180deg,#f3e3b0,#c9a85a) !important; color: #3a2a10 !important; border: none !important; font-weight: bold; }
   #dock { left: 50%; bottom: 10px; transform: translateX(-50%); padding: 6px 50px 6px 16px; width: max-content; min-width: 260px;
     max-width: calc(100vw - 16px); text-align: center; }
   #vs { font-size: 14px; letter-spacing: 1px; font-family: "KaiTi","STKaiti","Microsoft YaHei",serif; }
@@ -115,10 +116,13 @@
   <div id="vs"></div>
   <div id="status"></div>
   <div id="moveInfo"></div>
+  <div id="seatBar" style="display:none;margin:5px 0 2px;gap:8px;justify-content:center">
+    <button id="sitB" class="seatBtn">⚫ 坐下执黑</button><button id="sitW" class="seatBtn">⚪ 坐下执白</button>
+  </div>
   <button id="menuBtn" title="菜单" aria-label="菜单">☰</button>
 </div>
 <div id="menu" class="panel">
-  <h1>修仙五子棋 <span style="font-size:11px;letter-spacing:0;opacity:.6;-webkit-text-fill-color:#cfc6b0">版本 11-21 07:45</span></h1>
+  <h1>修仙五子棋 <span style="font-size:11px;letter-spacing:0;opacity:.6;-webkit-text-fill-color:#cfc6b0">版本 11-21 14:30</span></h1>
   <div id="realmName"></div>
   <div id="pips"></div>
   <div id="score"></div>
@@ -2159,7 +2163,6 @@ function reconcile() {
       return;
     }
     const r = onl.rec, here = presentIds();
-    if (!mySeat() && ((!r.b || !here.has(r.b)) || (!r.w || !here.has(r.w)))) { try { $('menu').classList.add('open'); } catch (e) {} }
   }
   applyRec(); renderOnline(); loadNames();
 }
@@ -2216,7 +2219,7 @@ function onlineMove(x, y) {
 function onlineStatusText() {
   if (!onl.nr) return '联机对战：进入房间后开始';
   const r = onl.rec, me = mySeat();
-  if (!r.b || !r.w || !presentIds().has(r.b) || !presentIds().has(r.w)) return me ? '等待另一位道友入座……' : '有空座：点右下角 ☰ 选「入座执黑 / 入座执白」';
+  if (!r.b || !r.w || !presentIds().has(r.b) || !presentIds().has(r.w)) return me ? '等待另一位道友入座……（把二维码发给家人）' : '有空座，点下面按钮坐下对弈';
   if (gameOver) {
     const wc = history.length ? history[history.length - 1].c : 0;
     if (!wc) return '对局结束';
@@ -2243,6 +2246,9 @@ function renderOnline(msg) {
   $('takeSeat').style.display = !me && (!r.b || !here.has(r.b)) ? '' : 'none';
   $('takeSeatW').style.display = !me && (!r.w || !here.has(r.w)) ? '' : 'none';
   $('watchBtn').style.display = me ? '' : 'none';
+  const fb = !me && (!r.b || !here.has(r.b)), fw = !me && (!r.w || !here.has(r.w));
+  $('seatBar').style.display = isOnline() && (fb || fw) ? 'flex' : 'none';
+  $('sitB').style.display = fb ? '' : 'none'; $('sitW').style.display = fw ? '' : 'none';
   $('watchBtn').textContent = '让座去观棋';
   updateStatus();
 }
@@ -2274,6 +2280,8 @@ function sitAt(seat) {
 }
 $('takeSeat').onclick = () => sitAt('b');
 $('takeSeatW').onclick = () => sitAt('w');
+$('sitB').onclick = e => { e.stopPropagation(); sitAt('b'); };
+$('sitW').onclick = e => { e.stopPropagation(); sitAt('w'); };
 $('watchBtn').onclick = () => {
   const me = mySeat(), r = onl.rec;
   if (me) {
@@ -2300,6 +2308,7 @@ $('undo').onclick = () => {
 };
 $('restart').onclick = () => { if (!started) return; if (isOnline()) { $('newGame').click(); return; } reset(); };
 modeEl.onchange = () => {
+  if (modeEl.value !== 'online') $('seatBar').style.display = 'none';
   if (!started) return;
   $('online').style.display = isOnline() ? 'block' : 'none';
   levelEl.style.display = isAI() ? '' : 'none';
